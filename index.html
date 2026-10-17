@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Місія «Аналітик даних»</title>
+<style>
+:root{--ink:#1d2b2a;--paper:#f3f6f1;--line:#d3dfd3;--green:#0f8a5f;--soft:#d9f0e5;--yellow:#ffd23f;--red:#d6453d;--softred:#fbdedb;--blue:#2b6cb0}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;color:var(--ink);background-color:var(--paper);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:36px 36px;min-height:100vh;line-height:1.5}
+#app{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:clamp(2rem,7vw,3.2rem);line-height:1.05;margin:.2em 0}
+h2{font-size:1.4rem;margin:.2em 0 .6em}
+.card{color:var(--ink);background:#fff;border:2px solid var(--ink);box-shadow:5px 5px 0 var(--ink);padding:20px;margin:14px 0}
+.tag{display:inline-block;background:var(--yellow);border:2px solid var(--ink);padding:1px 10px;font-weight:700;font-size:.85rem}
+svg.circuit{background:none;border:0;max-width:520px;display:block;margin:14px 0}
+input[type=text],input.num,select{font:inherit;padding:10px 12px;border:2px solid var(--ink);background:#fff;width:100%;max-width:340px}
+input.num{max-width:110px;text-align:center;font-weight:700}
+.btn,.opt{font:inherit;cursor:pointer;border:2px solid var(--ink);background:#fff;padding:11px 16px;text-align:left;color:var(--ink)}
+.btn{background:var(--green);color:#fff;font-weight:700;text-align:center;box-shadow:3px 3px 0 var(--ink);margin-top:12px}
+.btn.alt{background:#fff;color:var(--ink)}
+a.btn{display:inline-block;text-decoration:none}
+table{border-collapse:collapse;margin:8px 0}td,th{border:2px solid var(--ink);padding:4px 14px;text-align:center}th{background:var(--yellow)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.opts{display:grid;gap:10px;margin:12px 0}
+.opt:hover:not(:disabled){background:var(--soft)}
+.opt.good,select.good{background:var(--soft);border-color:var(--green)}
+.opt.bad,select.bad{background:var(--softred);border-color:var(--red)}
+.opt:disabled{cursor:default;color:var(--ink)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.q{font-size:1.1rem;font-weight:700;margin:.2em 0}
+.fb{margin-top:10px;padding:0;min-height:0}
+.fb:not(:empty){padding:10px 12px;border-left:6px solid var(--green);background:var(--soft)}
+.fb.no{border-color:var(--red);background:var(--softred)}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+.row select{max-width:170px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.chips b{border:2px solid var(--ink);min-width:42px;text-align:center;padding:6px;background:var(--yellow);font-size:1.15rem}
+.calc{display:flex;gap:16px;flex-wrap:wrap}.calc label{display:grid;gap:4px;font-weight:700}
+#hud{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+#bar{height:8px;background:#456;flex:1 1 100%}#bar i{display:block;height:100%;background:var(--yellow);transition:width .4s}
+svg{width:100%;height:auto;background:#fff;border:2px solid var(--ink)}
+.done{margin-top:14px;font-weight:700}
+.grade{width:130px;height:130px;border:4px solid var(--ink);border-radius:50%;display:grid;place-items:center;font-size:3rem;font-weight:800;background:var(--yellow);margin:8px 0}
+.grade small{font-size:1rem;display:block;text-align:center;margin-top:-18px}
+.tb{margin:12px 0}.tb .t{display:flex;justify-content:space-between;font-weight:700}
+.tb .bg{height:14px;border:2px solid var(--ink);background:#fff}.tb .bg i{display:block;height:100%;background:var(--green)}
+.tb .bg i.mid{background:var(--yellow)}.tb .bg i.low{background:var(--red)}
+.tb p{margin:.2em 0;font-size:.92rem}
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+@media print{body{background:#fff}#hud,.btns{display:none}.card{box-shadow:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $=(s,e=document)=>e.querySelector(s);
+const sh=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const fmt=n=>String(Math.round(n*10)/10).replace('.',',');
+const S={name:'',cls:'',i:0,pts:0,tp:{}};
+const app=$('#app');
+
+/* ---------- універсальний квіз ---------- */
+function quiz(qs,pre){return(el,done)=>{
+  let k=0,pts=0;
+  const show=()=>{
+    const q=qs[k];
+    const ord=q.fix?q.o.map((_,i)=>i):sh(q.o.map((_,i)=>i));
+    el.innerHTML=(q.pre?q.pre():pre?pre():'')+`<p class="q">${q.q}</p><div class="opts">${ord.map(i=>`<button class="opt" data-i="${i}">${q.o[i]}</button>`).join('')}</div><div class="fb" id="fb"></div><div id="nx"></div>`;
+    el.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+      const ok=+b.dataset.i===q.a;
+      if(ok)pts++;
+      el.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(+x.dataset.i===q.a)x.classList.add('good')});
+      if(!ok)b.classList.add('bad');
+      const fb=$('#fb',el);fb.className='fb'+(ok?'':' no');
+      fb.textContent=(ok?'Вірно! ':'Не зовсім. ')+q.e;
+      if(k<qs.length-1){$('#nx',el).innerHTML='<button class="btn alt" id="n">Наступне питання</button>';$('#n',el).onclick=()=>{k++;show()}}
+      else done(pts);
+    });
+  };show();
+}}
+
+/* ---------- обчислення: середнє, медіана, мода ---------- */
+function calcTask(el,done){
+  let d,mode;
+  for(;;){
+    d=Array.from({length:7},()=>1+Math.floor(Math.random()*9));
+    const c={};d.forEach(x=>c[x]=(c[x]||0)+1);
+    const m=Math.max(...Object.values(c)),ms=Object.keys(c).filter(x=>c[x]===m);
+    if(ms.length===1&&m>=2){mode=+ms[0];break}
+  }
+  const sum=d.reduce((a,b)=>a+b,0),mean=sum/7,med=[...d].sort((a,b)=>a-b)[3];
+  el.innerHTML=`<p class="q">Ось оцінки з міні-опитування. Знайди три показники.</p><p><b>Підказка:</b> спершу впорядкуй вибірку за зростанням (запиши числа від найменшого до найбільшого). Так легко знайти медіану, а також побачити, яке число повторюється найчастіше (мода).</p><div class="chips">${d.map(x=>`<b>${x}</b>`).join('')}</div>
+  <div class="calc"><label>Середнє (до десятих)<input class="num" id="c1" inputmode="decimal"></label><label>Медіана<input class="num" id="c2" inputmode="decimal"></label><label>Мода<input class="num" id="c3" inputmode="decimal"></label></div>
+  <button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  $('#chk').onclick=()=>{
+    const v=i=>parseFloat(($('#c'+i).value||'').replace(',','.'));
+    const r=[Math.abs(v(1)-mean)<=0.1,v(2)===med,v(3)===mode];
+    r.forEach((ok,i)=>$('#c'+(i+1)).style.background=ok?'#d9f0e5':'#fbdedb');
+    const p=r.filter(Boolean).length;
+    $('#chk').disabled=true;
+    const fb=$('#fb');fb.className='fb'+(p===3?'':' no');
+    fb.innerHTML=`Середнє: ${sum} ÷ 7 ≈ ${fmt(mean)}.<br>Медіана: у впорядкованому ряду посередині стоїть ${med}.<br>Мода: найчастіше трапляється ${mode}.`;
+    done(p);
+  };
+}
+
+/* ---------- функції Google Таблиць ---------- */
+function matchTask(el,done){
+  const rows=[['Середнє арифметичне діапазону','AVERAGE'],['Значення посередині впорядкованого ряду','MEDIAN'],['Найчастіше значення','MODE'],['Сума всіх чисел','SUM'],['Найбільше число','MAX']];
+  const fn=['AVERAGE','MEDIAN','MODE','SUM','MAX','MIN','COUNT'];
+  el.innerHTML=`<p class="q">Підбери функцію Google Таблиць до кожної задачі.</p>`+rows.map((r,i)=>`<div class="row"><span>${r[0]}</span><select id="s${i}"><option value="">Обери…</option>${sh(fn).map(f=>`<option>${f}</option>`).join('')}</select></div>`).join('')+`<button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  $('#chk').onclick=()=>{
+    let p=0;const wrong=[];
+    rows.forEach((r,i)=>{const s=$('#s'+i),ok=s.value===r[1];if(ok)p++;else wrong.push(`${r[0]}: ${r[1]}`);s.className=ok?'good':'bad';s.disabled=true});
+    $('#chk').disabled=true;
+    const fb=$('#fb');fb.className='fb'+(p===5?'':' no');
+    fb.innerHTML=p===5?'Усі функції підібрано правильно!':'Правильні відповіді:<br>'+wrong.join('<br>');
+    done(p);
+  };
+}
+
+/* ---------- порядок етапів ---------- */
+function orderTask(el,done){
+  const st=['Сформулювати питання','Зібрати дані','Очистити й упорядкувати дані','Порахувати й побудувати діаграми','Зробити висновки та поділитися ними'];
+  const pool=sh(st);let pick=[],locked=false;
+  const draw=()=>{
+    el.innerHTML=`<p class="q">Розстав етапи аналізу даних у правильному порядку: натискай по черзі.</p>
+    <ol>${pick.map(x=>`<li>${x}</li>`).join('')}</ol>
+    <div class="opts">${pool.filter(x=>!pick.includes(x)).map(x=>`<button class="opt" data-t="${x}">${x}</button>`).join('')}</div>
+    <div class="btns">${pick.length&&!locked?'<button class="btn alt" id="rs">Почати спочатку</button>':''}${pick.length===5&&!locked?'<button class="btn" id="ok">Перевірити</button>':''}</div><div class="fb" id="fb"></div>`;
+    el.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{pick.push(b.dataset.t);draw()});
+    if($('#rs'))$('#rs').onclick=()=>{pick=[];draw()};
+    if($('#ok'))$('#ok').onclick=()=>{
+      locked=true;const c=pick.filter((x,i)=>x===st[i]).length,p=c===5?2:c>=3?1:0;
+      draw();const fb=$('#fb');fb.className='fb'+(p===2?'':' no');
+      fb.innerHTML='Правильний порядок:<br>'+st.map((x,i)=>`${i+1}. ${x}`).join('<br>');
+      done(p);
+    };
+  };draw();
+}
+
+/* ---------- графіки ---------- */
+function lineChart(title,series,leg){
+  const m=['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+  const lines=series.map(o=>`<polyline points="${o.v.map((y,i)=>`${30+i*30},${130-y*1.1}`).join(' ')}" fill="none" stroke="${o.c}" stroke-width="3"/>`+o.v.map((y,i)=>`<circle cx="${30+i*30}" cy="${130-y*1.1}" r="3" fill="${o.c}"/>`).join('')).join('');
+  const lg=leg?series.map((o,i)=>`<text x="${230+i*80}" y="16" font-size="11" font-weight="700" fill="${o.c}">${o.n}</text>`).join(''):'';
+  return `<svg viewBox="0 0 400 175" role="img" aria-label="${title}"><text x="8" y="16" font-size="11" font-weight="700">${title}</text>${lg}<line x1="20" y1="132" x2="390" y2="132" stroke="#1d2b2a"/>${lines}${m.map((t,i)=>`<text x="${30+i*30}" y="146" font-size="9" text-anchor="middle">${t}</text>`).join('')}</svg>`;
+}
+const SKI=[85,100,60,30,15,10,8,10,20,35,55,90],BEACH=[10,10,15,30,55,80,100,90,50,25,12,10];
+const chart=()=>lineChart('Google Trends: запит «лижі», Україна, 12 місяців',[{v:SKI,c:'#0f8a5f'}]);
+const chart2=()=>lineChart('Google Trends: порівняння запитів',[{v:SKI,c:'#0f8a5f',n:'лижі'},{v:BEACH,c:'#2b6cb0',n:'пляж'}],1);
+const bars=()=>`<svg viewBox="0 0 300 175" role="img" aria-label="Стовпчаста діаграма продажів кав’ярні"><text x="8" y="16" font-size="12" font-weight="700">Продажі кав’ярні, тис. грн</text><line x1="40" y1="140" x2="290" y2="140" stroke="#1d2b2a"/><text x="6" y="143" font-size="10">50</text><text x="6" y="43" font-size="10">55</text><rect x="70" y="100" width="60" height="40" fill="#0f8a5f"/><rect x="170" y="40" width="60" height="100" fill="#0f8a5f"/><text x="100" y="94" font-size="12" text-anchor="middle">52</text><text x="200" y="34" font-size="12" text-anchor="middle">55</text><text x="100" y="157" font-size="11" text-anchor="middle">Січень</text><text x="200" y="157" font-size="11" text-anchor="middle">Лютий</text></svg>`;
+const tbl=()=>`<table><tr><th>Учень</th><th>Бал</th></tr>${[['Анна',9],['Богдан',7],['Влад',10],['Дана',9],['Єва',12],['Іван',8],['Марта',9]].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+
+/* ---------- розмах і частота ---------- */
+function rangeTask(el,done){
+  const d=Array.from({length:8},()=>3+Math.floor(Math.random()*10));
+  const x=d[Math.floor(Math.random()*8)],rg=Math.max(...d)-Math.min(...d),fr=d.filter(v=>v===x).length;
+  el.innerHTML=`<p class="q">Ряд даних: скільки годин на тиждень вісім учнів проводять за комп’ютером.</p><p><b>Підказка:</b> розмах = найбільше значення − найменше. Частота — скільки разів число трапляється в ряду.</p><div class="chips">${d.map(v=>`<b>${v}</b>`).join('')}</div>
+  <div class="calc"><label>Розмах<input class="num" id="c1" inputmode="numeric"></label><label>Скільки разів трапляється ${x}?<input class="num" id="c2" inputmode="numeric"></label></div>
+  <button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  $('#chk').onclick=()=>{
+    const v=i=>parseFloat(($('#c'+i).value||'').replace(',','.'));
+    const r=[v(1)===rg,v(2)===fr];
+    r.forEach((ok,i)=>$('#c'+(i+1)).style.background=ok?'#d9f0e5':'#fbdedb');
+    const p=r.filter(Boolean).length;$('#chk').disabled=true;
+    const fb=$('#fb');fb.className='fb'+(p===2?'':' no');
+    fb.innerHTML=`Розмах: ${Math.max(...d)} − ${Math.min(...d)} = ${rg}.<br>Число ${x} трапляється ${fr} р.`;
+    done(p);
+  };
+}
+
+/* ---------- завдання ---------- */
+const T=[
+{lvl:'Рівень 1',topic:'Поняття',title:'Що таке аналіз даних',max:2,run:quiz([
+ {q:'Що найточніше описує аналіз даних?',o:['Збирання випадкових цифр без мети','Обробка й дослідження даних, щоб знайти закономірності та зробити висновки','Малювання красивих діаграм','Зберігання файлів у хмарі'],a:1,e:'Аналіз даних — це шлях від сирих даних до обґрунтованих висновків.'},
+ {q:'Що з переліченого є висновком, а не даними?',o:['Температура: 18, 21, 19','У класі 24 учні','Комедії найпопулярніші, тому для заходу обираємо кіновечір','Оцінки: 9, 10, 8'],a:2,e:'Дані — це факти й числа, а висновок — це наше пояснення, зроблене на їхній основі.'}])},
+{lvl:'Рівень 2',topic:'Штучний інтелект',title:'ШІ-помічник аналітика',max:2,run:quiz([
+ {q:'Чим ШІ допомагає в аналізі даних?',o:['Швидко знаходить закономірності у великих масивах даних','Гарантує 100% правду без перевірки','Робить зайвим розуміння даних','Працює лише з таблицями до 10 рядків'],a:0,e:'ШІ прискорює роботу, але відповідальність за висновки залишається за людиною.'},
+ {q:'ШІ видав висновок за вашими даними. Що робити далі?',o:['Одразу повірити й вставити у звіт','Перевірити висновок на самих даних і джерелах','Видалити дані, щоб не було суперечок','Перепитувати, доки відповідь не сподобається'],a:1,e:'ШІ може помилятися, тому його висновки перевіряють.'}])},
+{lvl:'Рівень 2',topic:'Штучний інтелект',title:'Запити до ШІ й безпека даних',max:2,run:quiz([
+ {q:'Який запит до ШІ-помічника дасть найкращу відповідь?',o:['«Проаналізуй»','«Ось оцінки класу з інформатики. Знайди середнє й медіану та поясни, які висновки можна зробити»','«Зроби щось із цими цифрами»','«Дай відповідь і нічого не пояснюй»'],a:1,e:'Хороший запит містить контекст, дані й чітке завдання.'},
+ {q:'Чи можна вставляти в чат із ШІ таблицю з прізвищами, телефонами й адресами учнів?',o:['Так, ШІ завжди безпечний','Ні, персональні дані треба прибрати або знеособити','Так, якщо ввічливо попросити','Можна, якщо сховати лише телефони'],a:1,e:'Персональні дані не передають стороннім сервісам. Замість імен використовують коди, наприклад «Учень 1».'}])},
+{lvl:'Рівень 3',topic:'Підготовка даних',title:'Підготовка й вибірка',max:3,run:quiz([
+ {q:'Що з переліченого є кількісними даними?',o:['Колір очей','Зріст у сантиметрах','Улюблений жанр музики','Місто проживання'],a:1,e:'Кількісні дані — це числа, з якими можна рахувати. Колір, жанр і місто — якісні дані.'},
+ {q:'У таблиці опитування два однакові рядки однієї людини. Що з цим робити?',o:['Залишити, щоб даних було більше','Видалити дублікат, інакше результат буде спотворено','Змінити одному рядку ім’я','Перемножити їх'],a:1,e:'Очищення даних (дублікати, пропуски, помилки) виконують до аналізу.'},
+ {q:'Щоб дізнатися, як у школі ставляться до їдальні, опитали лише 5 учнів 10-А. Чому висновок ненадійний?',o:['Вибірка мала й не представляє всю школу','Не вистачає діаграми','Треба було питати лише вчителів','Усе гаразд'],a:0,e:'Вибірка має бути достатньою та репрезентативною.'}])},
+{lvl:'Рівень 4',topic:'Статистика',title:'Середнє, медіана, мода',max:3,run:calcTask},
+{lvl:'Рівень 4',topic:'Статистика',title:'Розмах і частота',max:2,run:rangeTask},
+{lvl:'Рівень 4',topic:'Статистика',title:'Читаємо таблицю',max:3,run:quiz([
+ {q:'Який розмах цього ряду балів?',o:['3','5','9','12'],a:1,e:'Розмах: 12 − 7 = 5.'},
+ {q:'Скільки учнів мають бал вище середнього? Середнє ≈ 9,1.',o:['1','2','3','4'],a:1,e:'Середнє: 64 ÷ 7 ≈ 9,1. Вище нього лише 10 (Влад) і 12 (Єва).'},
+ {q:'Який фільтр у таблиці залишить лише Влада та Єву?',o:['Бал більше 9','Бал менше 9','Бал дорівнює 9','Бал не дорівнює 12'],a:0,e:'Фільтр «Бал > 9» показує лише рядки, які відповідають умові.'}],tbl)},
+{lvl:'Рівень 4',topic:'Статистика',title:'Одне дуже велике значення',max:1,run:quiz([
+ {q:'У маленькій фірмі працює 6 людей. Їхні місячні зарплати (тис. грн): 12, 12, 13, 13, 14 і 95 (стільки отримує директор).<br><br>Значення, яке різко відрізняється від решти (тут це 95), називають викидом. Він може «перетягнути» середнє на себе.<br><br>Журналіст хоче написати, скільки отримує типовий працівник цієї фірми. Яке число для цього найчесніше?',o:['Середнє: 26,5 тис. грн','Медіана: 13 тис. грн','Найбільше значення: 95 тис. грн','Усі показники однаково добре описують типову зарплату'],a:1,e:'Середнє (159 ÷ 6 = 26,5) завищене через директора, і нікому з п’яти працівників стільки не платять. Медіана — середина впорядкованого ряду (13 і 13) — показує типову зарплату. Тому за наявності викидів краще брати медіану.'}])},
+{lvl:'Рівень 5',topic:'Google Таблиці',title:'Функції в Google Таблицях',max:5,run:matchTask},
+{lvl:'Рівень 5',topic:'Google Таблиці',title:'Формули, фільтри, зведені таблиці',max:4,run:quiz([
+ {q:'Яка функція підрахує, скільки клітинок діапазону відповідають умові (наприклад, оцінки від 10)?',o:['COUNTIF','SUM','MEDIAN','MAX'],a:0,e:'COUNTIF рахує клітинки за умовою.'},
+ {q:'Що зробить формула =IF(B2&gt;=7; "склав"; "не склав")?',o:['Покаже «склав», якщо в B2 число 7 або більше, інакше «не склав»','Додасть 7 до B2','Знайде середнє значення','Відсортує стовпець'],a:0,e:'IF перевіряє умову й повертає одне з двох значень.'},
+ {q:'Для чого потрібен фільтр у таблиці?',o:['Показати лише рядки, що відповідають умові, не видаляючи решту','Назавжди видалити зайві рядки','Побудувати діаграму','Порахувати суму'],a:0,e:'Фільтр лише ховає рядки, дані залишаються в таблиці.'},
+ {q:'Що допоможе швидко підбити підсумки великої таблиці за категоріями (наприклад, середній бал за класами)?',o:['Зведена таблиця','Умовне форматування','Захист аркуша','Коментар до клітинки'],a:0,e:'Зведена таблиця групує дані й рахує підсумки за категоріями.'}])},
+{lvl:'Рівень 6',topic:'Візуалізація',title:'Діаграми й чесна візуалізація',max:4,run:quiz([
+ {q:'Лютневі продажі виглядають майже втричі більшими за січневі. Чому ця діаграма вводить в оману?',pre:bars,o:['Вісь починається не з нуля, тому різниця між 52 і 55 здається величезною','Бракує кругової діаграми','Забагато кольорів','Стовпчики мають бути горизонтальними'],a:0,e:'Насправді 55 лише трохи більше за 52. Чесна діаграма починає стовпчики з нуля.'},
+ {q:'Яка діаграма найкраще покаже, як щодня змінювалася температура протягом місяця?',o:['Лінійна: вона показує зміни в часі','Кругова: вона показує частки від цілого','Жодна, достатньо таблиці','Кругова з 30 секторами'],a:0,e:'Для змін у часі добирають лінійний графік.'},
+ {q:'Яку діаграму обрати, щоб показати, з чого складається сімейний бюджет (частки витрат)?',o:['Кругову','Лінійну','Точкову','Жодну'],a:0,e:'Кругова діаграма показує частки від цілого.'},
+ {q:'Що показує лінія тренду на графіку?',o:['Загальний напрямок змін даних, що допомагає передбачити подальші значення','Найбільше значення ряду','Кількість повторів у ряді','Помилки в таблиці'],a:0,e:'Лінія тренду згладжує коливання й показує тенденцію.'}])},
+{lvl:'Рівень 7',topic:'Google Trends',title:'Читаємо графік тенденцій',max:2,run:quiz([
+ {q:'У якому місяці інтерес до запиту найвищий?',o:['Лютий','Липень','Жовтень','Квітень'],a:0,e:'Пік у лютому, а влітку інтерес мінімальний. Це сезонність.'},
+ {q:'Що означає значення 100 у Google Trends?',o:['100 000 пошукових запитів','Пік популярності за обраний період і регіон','100% користувачів шукали це слово','Помилку в даних'],a:1,e:'Google Trends показує відносний інтерес від 0 до 100, а не кількість пошуків.'}],chart)},
+{lvl:'Рівень 7',topic:'Google Trends',title:'Порівнюємо запити',max:2,run:quiz([
+ {q:'У якому місяці найвищий інтерес до запиту «пляж»?',o:['Січень','Липень','Жовтень','Грудень'],a:1,e:'Синя лінія досягає піку влітку.'},
+ {q:'Який висновок із цього графіка найлогічніший?',o:['Інтерес до запитів змінюється за порами року: взимку лижі, влітку пляж','Лижі та пляж — одне й те саме','Улітку лижі зникають із продажу','Пляжів більше, ніж лиж'],a:0,e:'Графік показує відносний інтерес і сезонність. Про продажі чи кількість він не говорить.'}],chart2)},
+{lvl:'Рівень 8',topic:'Критичне мислення',title:'Правда чи хиба',max:5,run:quiz([
+ {q:'Медіана — це значення посередині впорядкованого ряду.',o:['Правда','Хиба'],a:0,fix:1,e:'Так, ряд спочатку впорядковують за зростанням.'},
+ {q:'Мода — це сума значень, поділена на їхню кількість.',o:['Правда','Хиба'],a:1,fix:1,e:'Це середнє. Мода — найчастіше значення.'},
+ {q:'Google Trends показує абсолютну кількість пошуків.',o:['Правда','Хиба'],a:1,fix:1,e:'Лише відносний інтерес від 0 до 100.'},
+ {q:'Один дуже великий викид сильно змінює середнє значення.',o:['Правда','Хиба'],a:0,fix:1,e:'Тому для даних із викидами корисна медіана.'},
+ {q:'Якщо дві величини змінюються разом, одна обов’язково є причиною іншої.',o:['Правда','Хиба'],a:1,fix:1,e:'Кореляція не доводить причинності: може бути третій чинник або збіг.'}])},
+{lvl:'Рівень 8',topic:'Критичне мислення',title:'Шлях аналітика',max:2,run:orderTask}
+];
+const MAX=T.reduce((a,t)=>a+t.max,0);
+const TIPS={'Поняття':'Повтори, чим відрізняються дані, інформація й висновок.','Штучний інтелект':'Повтори, як формулювати запити до ШІ, чому його відповіді треба перевіряти і чому не можна передавати персональні дані.','Підготовка даних':'Повтори типи даних, очищення (дублікати, пропуски) та що таке репрезентативна вибірка.','Статистика':'Потренуй середнє, медіану, моду, розмах і частоту на власних наборах чисел, а також розглянь викиди.','Google Таблиці':'Попрацюй у Google Таблицях: AVERAGE, MEDIAN, MODE, COUNTIF, IF, фільтри, зведені таблиці.','Візуалізація':'Повтори, яку діаграму для чого обирати, що таке лінія тренду і як не спотворювати дані.','Google Trends':'Відкрий Google Trends, порівняй два запити й подивись, що означають значення 0–100 та сезонність.','Критичне мислення':'Повтори етапи аналізу даних і різницю між кореляцією та причиною.'};
+
+/* ---------- екрани ---------- */
+function hud(bar=true){return `<div id="hud"><b>${S.name}, ${S.cls}</b><span>Бали: <b id="sc">${S.pts}</b> з ${MAX}</span>${bar?`<div id="bar"><i style="width:${S.i/T.length*100}%"></i></div>`:''}</div>`}
+function start(){
+  app.innerHTML=`<section class="card"><span class="tag">ІТ-студія, 10 клас</span><h1>Місія «Аналітик даних»</h1>
+  <svg class="circuit" viewBox="0 0 600 150" role="img" aria-label="Схема мікросхеми з лініями даних"><g fill="none" stroke="#1d2b2a" stroke-width="2"><path d="M0 45H70V30H150V50H230"/><path d="M0 75H230"/><path d="M0 105H50V125H140V100H230"/><path d="M370 45H450V25H530V45H600"/><path d="M370 75H480V95H560V75H600"/><path d="M370 105H420V125H510V105H600"/><path d="M260 10V20M290 10V20M320 10V20M350 10V20M260 130V140M290 130V140M320 130V140M350 130V140"/><rect x="230" y="20" width="140" height="110" fill="#fff"/><path d="M255 110H345"/></g><rect x="262" y="85" width="14" height="25" fill="#0f8a5f"/><rect x="286" y="62" width="14" height="48" fill="#ffd23f" stroke="#1d2b2a" stroke-width="2"/><rect x="310" y="75" width="14" height="35" fill="#0f8a5f"/><rect x="334" y="50" width="14" height="60" fill="#ffd23f" stroke="#1d2b2a" stroke-width="2"/><circle cx="246" cy="36" r="3.5" fill="#1d2b2a"/><g stroke="#1d2b2a" stroke-width="2"><circle cx="150" cy="30" r="5" fill="#ffd23f"/><circle cx="140" cy="125" r="5" fill="#0f8a5f"/><circle cx="530" cy="25" r="5" fill="#0f8a5f"/><circle cx="510" cy="125" r="5" fill="#ffd23f"/><circle cx="480" cy="75" r="5" fill="#ffd23f"/><circle cx="560" cy="95" r="5" fill="#0f8a5f"/></g></svg>
+  <p>${T.length} завдань про аналіз даних, ШІ, Google Таблиці й Google Trends. За кожну правильну відповідь ти отримуєш бали, а в кінці побачиш свою оцінку за 12-бальною шкалою та звіт про те, що опановано.</p>
+  <label for="nm"><b>Твоє ім’я та прізвище</b></label><br><input type="text" id="nm" autocomplete="off" placeholder="Наприклад, Олена Шевченко">
+  <br><br><label for="cl"><b>Клас</b></label><br><input type="text" id="cl" autocomplete="off" placeholder="Наприклад, 10-А">
+  <div class="fb no" id="er" hidden></div>
+  <br><button class="btn" id="go">Почати місію</button></section>`;
+  $('#go').onclick=()=>{const n=$('#nm').value.trim(),c=$('#cl').value.trim();if(!n||!c){const e=$('#er');e.hidden=false;e.textContent='Вкажи ім’я, прізвище й клас, наприклад 10-А, щоб учитель знав, чий це результат.';return}S.name=n;S.cls=c;S.i=0;S.pts=0;S.tp={};task()};
+  $('#nm').onkeydown=$('#cl').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
+}
+function task(){
+  const t=T[S.i];
+  app.innerHTML=hud()+`<section class="card"><span class="tag">${t.lvl}: ${t.topic}</span><h2>${t.title}</h2><div id="body"></div><div id="nav"></div></section>`;
+  t.run($('#body'),done);
+  window.scrollTo(0,0);
+}
+function done(p){
+  const t=T[S.i],o=S.tp[t.topic]||(S.tp[t.topic]={p:0,m:0});
+  o.p+=p;o.m+=t.max;S.pts+=p;
+  $('#sc').textContent=S.pts;$('#bar i').style.width=(S.i+1)/T.length*100+'%';
+  const last=S.i===T.length-1;
+  $('#nav').innerHTML=`<p class="done">Отримано балів: ${p} з ${t.max}</p><button class="btn" id="nxt">${last?'Побачити звіт':'Далі'}</button>`;
+  $('#nxt').onclick=()=>{S.i++;last?report():task()};
+  $('#nxt').focus();
+}
+function report(){
+  const g=Math.max(1,Math.min(12,Math.round(S.pts/MAX*12)));
+  const rank=g>=10?'Експерт даних':g>=7?'Аналітик':g>=4?'Стажер-аналітик':'Початківець';
+  const ks=Object.keys(S.tp);
+  const rows=ks.map(k=>{const o=S.tp[k],pc=Math.round(o.p/o.m*100),cl=pc>=80?'':pc>=50?'mid':'low',st=pc>=80?'Опановано':pc>=50?'Майже опановано':'Потребує повторення';
+    return `<div class="tb"><div class="t"><span>${k}</span><span>${o.p}/${o.m}, ${pc}%</span></div><div class="bg"><i class="${cl}" style="width:${pc}%"></i></div><p>${st}.${pc<80?' '+TIPS[k]:''}</p></div>`}).join('');
+  const weak=ks.filter(k=>S.tp[k].p/S.tp[k].m<0.8);
+  const sum=weak.length?`Для підвищення результату повтори: ${weak.join(', ')}.`:'Тему засвоєно на високому рівні. Так тримати!';
+  app.innerHTML=hud(false)+`<section class="card"><span class="tag">Звіт про засвоєння теми</span><h1>${S.name}</h1><p><b>Клас: ${S.cls}</b></p>
+  <div class="grade">${g}<small>з 12</small></div>
+  <p><b>Рівень: ${rank}.</b> Набрано ${S.pts} з ${MAX} балів (${Math.round(S.pts/MAX*100)}%). Дата: ${new Date().toLocaleDateString('uk-UA')}.</p>
+  ${rows}<p><b>${sum}</b></p>
+  <div class="btns"><button class="btn alt" id="pr">Друкувати / зберегти PDF</button><button class="btn alt" id="cp">Скопіювати результат</button><button class="btn alt" id="rp">Пройти ще раз</button></div><div class="fb" id="fb"></div></section>`;
+  $('#pr').onclick=()=>window.print();
+  $('#rp').onclick=start;
+  $('#cp').onclick=()=>{
+    const tx=`${S.name} (${S.cls}): оцінка ${g}/12 (${S.pts} з ${MAX} балів). `+ks.map(k=>`${k} ${S.tp[k].p}/${S.tp[k].m}`).join('; ');
+    const ok=()=>{$('#fb').textContent='Результат скопійовано. Надішли його вчителю.'};
+    try{navigator.clipboard.writeText(tx).then(ok,()=>{$('#fb').textContent=tx})}catch(e){$('#fb').textContent=tx}
+  };
+  window.scrollTo(0,0);
+}
+start();
+</script>
+</body>
+</html>
