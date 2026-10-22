@@ -200,8 +200,11 @@ th{background:rgba(255,255,255,0.03);color:#ffffff;font-weight:600}
   margin-bottom: 20px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
 }
-#bar{height:6px;background:var(--edge);border-radius:3px;flex:1 1 100%;overflow:hidden}
-#bar i{display:block;height:100%;background:#22c55e;transition:width .4s ease;border-radius:3px}
+#bar{height:8px;background:var(--edge);border-radius:4px;flex:1 1 100%;transition:background .3s ease}
+.cnt{font-size:.9rem;color:#a3a3a3}.cnt b{color:#fff}.cnt .ok{color:#22c55e}.cnt .no{color:#f43f5e}
+.btn.hintbtn{margin:0 0 12px;padding:8px 14px;font-size:.88rem;color:#facc15;border-color:rgba(250,204,21,.35);background:rgba(250,204,21,.06);box-shadow:none}
+.btn.hintbtn:hover{background:rgba(250,204,21,.12);border-color:#facc15}
+.hintbox{margin:0 0 14px;padding:12px 14px;border-left:4px solid #facc15;background:rgba(250,204,21,.07);border-radius:10px;color:#e5e5e5;font-size:.95rem}
 
 svg{width:100%;height:auto;color:var(--text);background:var(--field);border:1px solid var(--edge);border-radius:12px}
 svg text:not([fill]){fill:currentColor}
@@ -248,25 +251,28 @@ svg text:not([fill]){fill:currentColor}
 const $=(s,e=document)=>e.querySelector(s);
 const sh=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const fmt=n=>String(Math.round(n*10)/10).replace('.',',');
-const S={name:'',cls:'',i:0,pts:0,tp:{}};
+const KEY='analiz-danykh-10-v1';
+const fresh=()=>({i:0,res:[],tp:{},k:0,fin:false,end:false,hints:0,hu:{}});
+const S=Object.assign({name:'',cls:''},fresh());
 const app=$('#app');
 
 /* ---------- універсальний квіз ---------- */
 function quiz(qs,pre){return(el,done)=>{
-  let k=0,pts=0;
+  let k=Math.min(S.k||0,qs.length-1);
   const show=()=>{
     const q=qs[k];
     const ord=q.fix?q.o.map((_,i)=>i):sh(q.o.map((_,i)=>i));
-    el.innerHTML=(q.pre?q.pre():pre?pre():'')+`<p class="q">${q.q}</p><div class="opts">${ord.map(i=>`<button class="opt" data-i="${i}">${q.o[i]}</button>`).join('')}</div><div class="fb" id="fb"></div><div id="nx"></div>`;
+    el.innerHTML=(q.pre?q.pre():pre?pre():'')+`<p class="q">${q.q}</p><div id="hz"></div><div class="opts">${ord.map(i=>`<button class="opt" data-i="${i}">${q.o[i]}</button>`).join('')}</div><div class="fb" id="fb"></div><div id="nx"></div>`;
+    hintUI(el,`${S.i}:${k}`,q.h);
     el.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
       const ok=+b.dataset.i===q.a;
-      if(ok)pts++;
       el.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(+x.dataset.i===q.a)x.classList.add('good')});
       if(!ok)b.classList.add('bad');
+      hintOff(el);rec(ok);S.k=k+1;save();
       const fb=$('#fb',el);fb.className='fb'+(ok?'':' no');
       fb.textContent=(ok?'Вірно! ':'Не зовсім. ')+q.e;
       if(k<qs.length-1){$('#nx',el).innerHTML='<button class="btn alt" id="n">Наступне питання</button>';$('#n',el).onclick=()=>{k++;show()}}
-      else done(pts);
+      else done();
     });
   };show();
 }}
@@ -281,9 +287,10 @@ function calcTask(el,done){
     if(ms.length===1&&m>=2){mode=+ms[0];break}
   }
   const sum=d.reduce((a,b)=>a+b,0),mean=sum/7,med=[...d].sort((a,b)=>a-b)[3];
-  el.innerHTML=`<p class="q">Ось оцінки з міні-опитування. Знайди три показники.</p><p style="color:#a3a3a3;font-size:0.95rem;margin-bottom:16px;"><b>Підказка:</b> спершу впорядкуй вибірку за зростанням (запиши числа від найменшого до найбільшого). Так легко знайти медіану, а також побачити, яке число повторюється найчастіше (мода).</p><div class="chips">${d.map(x=>`<b>${x}</b>`).join('')}</div>
+  el.innerHTML=`<p class="q">Ось оцінки з міні-опитування. Знайди три показники.</p><div id="hz"></div><div class="chips">${d.map(x=>`<b>${x}</b>`).join('')}</div>
   <div class="calc"><label>Середнє (до десятих)<input class="num" id="c1" inputmode="decimal"></label><label>Медіана<input class="num" id="c2" inputmode="decimal"></label><label>Мода<input class="num" id="c3" inputmode="decimal"></label></div>
   <button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  hintUI(el,`${S.i}`,'Спершу впорядкуй вибірку за зростанням. Медіана — число посередині впорядкованого ряду (з 7 чисел це четверте). Мода — число, яке трапляється найчастіше. Середнє — сума всіх чисел, поділена на 7.');
   $('#chk').onclick=()=>{
     const v=i=>parseFloat(($('#c'+i).value||'').replace(',','.'));
     const r=[Math.abs(v(1)-mean)<=0.1,v(2)===med,v(3)===mode];
@@ -292,7 +299,7 @@ function calcTask(el,done){
     $('#chk').disabled=true;
     const fb=$('#fb');fb.className='fb'+(p===3?'':' no');
     fb.innerHTML=`Середнє: ${sum} ÷ 7 ≈ ${fmt(mean)}.<br>Медіана: у впорядкованому ряду посередині стоїть ${med}.<br>Мода: найчастіше трапляється ${mode}.`;
-    done(p);
+    hintOff(el);r.forEach(ok=>rec(ok));done();
   };
 }
 
@@ -300,14 +307,15 @@ function calcTask(el,done){
 function matchTask(el,done){
   const rows=[['Середнє арифметичне діапазону','AVERAGE'],['Значення посередині впорядкованого ряду','MEDIAN'],['Найчастіше значення','MODE'],['Сума всіх чисел','SUM'],['Найбільше число','MAX']];
   const fn=['AVERAGE','MEDIAN','MODE','SUM','MAX','MIN','COUNT'];
-  el.innerHTML=`<p class="q">Підбери функцію Google Таблиць до кожної задачі.</p>`+rows.map((r,i)=>`<div class="row"><span style="color:#e5e5e5">${r[0]}</span><select id="s${i}"><option value="">Обери…</option>${sh(fn).map(f=>`<option>${f}</option>`).join('')}</select></div>`).join('')+`<button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  el.innerHTML=`<p class="q">Підбери функцію Google Таблиць до кожної задачі.</p><div id="hz"></div>`+rows.map((r,i)=>`<div class="row"><span style="color:#e5e5e5">${r[0]}</span><select id="s${i}"><option value="">Обери…</option>${sh(fn).map(f=>`<option>${f}</option>`).join('')}</select></div>`).join('')+`<button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  hintUI(el,`${S.i}`,'Англійські назви схожі на українські терміни: AVERAGE — середнє, MEDIAN — медіана, MODE — мода. SUM додає числа, а MAX шукає найбільше.');
   $('#chk').onclick=()=>{
-    let p=0;const wrong=[];
-    rows.forEach((r,i)=>{const s=$('#s'+i),ok=s.value===r[1];if(ok)p++;else wrong.push(`${r[0]}: ${r[1]}`);s.className=ok?'good':'bad';s.disabled=true});
+    hintOff(el);let p=0;const wrong=[];
+    rows.forEach((r,i)=>{const s=$('#s'+i),ok=s.value===r[1];rec(ok);if(ok)p++;else wrong.push(`${r[0]}: ${r[1]}`);s.className=ok?'good':'bad';s.disabled=true});
     $('#chk').disabled=true;
     const fb=$('#fb');fb.className='fb'+(p===5?'':' no');
     fb.innerHTML=p===5?'Усі функції підібрано правильно!':'Правильні відповіді:<br>'+wrong.join('<br>');
-    done(p);
+    done();
   };
 }
 
@@ -316,17 +324,18 @@ function orderTask(el,done){
   const st=['Сформулювати питання','Зібрати дані','Очистити й упорядкувати дані','Порахувати й побудувати діаграми','Зробити висновки та поділитися ними'];
   const pool=sh(st);let pick=[],locked=false;
   const draw=()=>{
-    el.innerHTML=`<p class="q">Розстав етапи аналізу даних у правильному порядку: натискай по черзі.</p>
+    el.innerHTML=`<p class="q">Розстав етапи аналізу даних у правильному порядку: натискай по черзі.</p><div id="hz"></div>
     <ol style="margin: 0 0 16px 20px; color: #a3a3a3;">${pick.map(x=>`<li style="margin-bottom:6px; color: #ffffff; font-weight:500;">${x}</li>`).join('')}</ol>
     <div class="opts">${pool.filter(x=>!pick.includes(x)).map(x=>`<button class="opt" data-t="${x}">${x}</button>`).join('')}</div>
     <div class="btns">${pick.length&&!locked?'<button class="btn alt" id="rs">Почати спочатку</button>':''}${pick.length===5&&!locked?'<button class="btn" id="ok">Перевірити</button>':''}</div><div class="fb" id="fb"></div>`;
+    if(!locked||S.hu[`${S.i}`])hintUI(el,`${S.i}`,'Подумай, що аналітик робить найпершим: з’ясовує, навіщо йому дані. А останнім він розповідає іншим про результат.');
     el.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{pick.push(b.dataset.t);draw()});
     if($('#rs'))$('#rs').onclick=()=>{pick=[];draw()};
     if($('#ok'))$('#ok').onclick=()=>{
-      locked=true;const c=pick.filter((x,i)=>x===st[i]).length,p=c===5?2:c>=3?1:0;
-      draw();const fb=$('#fb');fb.className='fb'+(p===2?'':' no');
+      locked=true;const c=pick.filter((x,i)=>x===st[i]).length,p=c===5?1:0;
+      draw();const fb=$('#fb');fb.className='fb'+(p===1?'':' no');
       fb.innerHTML='Правильний порядок:<br>'+st.map((x,i)=>`${i+1}. ${x}`).join('<br>');
-      done(p);
+      rec(p===1);done();
     };
   };draw();
 }
@@ -364,9 +373,10 @@ const tbl=()=>`<table><tr><th>Учень/учениця</th><th>Бал</th></tr>
 function rangeTask(el,done){
   const d=Array.from({length:8},()=>3+Math.floor(Math.random()*10));
   const x=d[Math.floor(Math.random()*8)],rg=Math.max(...d)-Math.min(...d),fr=d.filter(v=>v===x).length;
-  el.innerHTML=`<p class="q">Ряд даних: скільки годин на тиждень вісім учнів проводять за комп’ютером.</p><p style="color:#a3a3a3;font-size:0.95rem;margin-bottom:16px;"><b>Підказка:</b> розмах = найбільше значення − найменше. Частота — скільки разів число трапляється в ряду.</p><div class="chips">${d.map(v=>`<b>${v}</b>`).join('')}</div>
+  el.innerHTML=`<p class="q">Ряд даних: скільки годин на тиждень вісім учнів проводять за комп’ютером.</p><div id="hz"></div><div class="chips">${d.map(v=>`<b>${v}</b>`).join('')}</div>
   <div class="calc"><label>Розмах<input class="num" id="c1" inputmode="numeric"></label><label>Скільки разів трапляється ${x}?<input class="num" id="c2" inputmode="numeric"></label></div>
   <button class="btn" id="chk">Перевірити</button><div class="fb" id="fb"></div>`;
+  hintUI(el,`${S.i}`,'Розмах = найбільше значення − найменше. Частота — скільки разів число трапляється в ряду: порахуй його серед усіх чисел.');
   $('#chk').onclick=()=>{
     const v=i=>parseFloat(($('#c'+i).value||'').replace(',','.'));
     const r=[v(1)===rg,v(2)===fr];
@@ -374,7 +384,7 @@ function rangeTask(el,done){
     const p=r.filter(Boolean).length;$('#chk').disabled=true;
     const fb=$('#fb');fb.className='fb'+(p===2?'':' no');
     fb.innerHTML=`Розмах: ${Math.max(...d)} − ${Math.min(...d)} = ${rg}.<br>Число ${x} трапляється ${fr} р.`;
-    done(p);
+    hintOff(el);r.forEach(ok=>rec(ok));done();
   };
 }
 
@@ -387,54 +397,77 @@ const T=[
  {q:'Чим ШІ допомагає в аналізі даних?',o:['Швидко знаходить закономірності у великих масивах даних','Гарантує 100% правду без перевірки','Робить зайвим розуміння даних','Працює лише з таблицями до 10 рядків'],a:0,e:'ШІ прискорює роботу, але відповідальність за висновки залишається за людиною.'},
  {q:'ШІ видав висновок за вашими даними. Що робити далі?',o:['Одразу повірити й вставити у звіт','Перевірити висновок на самих даних і джерелах','Видалити дані, щоб не було суперечок','Перепитувати, доки відповідь не сподобається'],a:1,e:'ШІ може помилятися, тому його висновки перевіряють.'}])},
 {lvl:'Рівень 2',topic:'Штучний інтелект',title:'Запити до ШІ й безпека даних',max:2,run:quiz([
- {q:'Який запит до ШІ-помічника дасть найкращу відповідь?',o:['«Проаналізуй»','«Ось оцінки класу з інформатики. Знайди середнє й медіану та поясни, які висновки можна зробити»','«Зроби щось із цими цифрами»','«Дай відповідь і нічого не пояснюй»'],a:1,e:'Хороший запит містить контекст, дані й чітке завдання.'},
+ {h:'Хороший запит містить контекст, самі дані та чітко сформульоване завдання.',q:'Який запит до ШІ-помічника дасть найкращу відповідь?',o:['«Проаналізуй»','«Ось оцінки класу з інформатики. Знайди середнє й медіану та поясни, які висновки можна зробити»','«Зроби щось із цими цифрами»','«Дай відповідь і нічого не пояснюй»'],a:1,e:'Хороший запит містить контекст, дані й чітке завдання.'},
  {q:'Чи можна вставляти в чат із ШІ таблицю з прізвищами, телефонами й адресами учнів?',o:['Так, ШІ завжди безпечний','Ні, персональні дані треба прибрати або знеособити','Так, якщо ввічливо попросити','Можна, якщо сховати лише телефони'],a:1,e:'Персональні дані не передають стороннім сервісам. Замість імен використовують коди, наприклад «Учень 1».'}])},
 {lvl:'Рівень 3',topic:'Підготовка даних',title:'Підготовка й вибірка',max:3,run:quiz([
- {q:'Що з переліченого є кількісними даними?',o:['Колір очей','Зріст у сантиметрах','Улюблений жанр музики','Місто проживання'],a:1,e:'Кількісні дані — це числа, з якими можна рахувати. Колір, жанр і місто — якісні дані.'},
+ {h:'Кількісні дані вимірюють числом, а якісні описують ознаку словами.',q:'Що з переліченого є кількісними даними?',o:['Колір очей','Зріст у сантиметрах','Улюблений жанр музики','Місто проживання'],a:1,e:'Кількісні дані — це числа, з якими можна рахувати. Колір, жанр і місто — якісні дані.'},
  {q:'У таблиці опитування два однакові рядки однієї людини. Що з цим робити?',o:['Залишити, щоб даних було більше','Видалити дублікат, інакше результат буде спотворено','Змінити одному рядку ім’я','Перемножити їх'],a:1,e:'Очищення даних (дублікати, пропуски, помилки) виконують до аналізу.'},
  {q:'Щоб дізнатися, як у школі ставляться до їдальні, опитали лише 5 учнів 10-А. Чому висновок ненадійний?',o:['Вибірка мала й не представляє всю школу','Не вистачає діаграми','Треба було питати лише вчителів','Усе гаразд'],a:0,e:'Вибірка має бути достатньою та репрезентативною.'}])},
 {lvl:'Рівень 4',topic:'Статистика',title:'Середнє, медіана, мода',max:3,run:calcTask},
 {lvl:'Рівень 4',topic:'Статистика',title:'Розмах і частота',max:2,run:rangeTask},
 {lvl:'Рівень 4',topic:'Статистика',title:'Читаємо таблицю',max:3,run:quiz([
- {q:'Який розмах цього ряду балів?',o:['3','5','9','12'],a:1,e:'Розмах: 12 − 7 = 5.'},
- {q:'Скільки учнів мають бал вище середнього? Середнє ≈ 9,1.',o:['1','2','3','4'],a:1,e:'Середнє: 64 ÷ 7 ≈ 9,1. Вище нього лише 10 (Влад) і 12 (Єва).'},
- {q:'Який фільтр у таблиці залишить лише Влада та Єву?',o:['Бал більше 9','Бал менше 9','Бал дорівнює 9','Бал не дорівнює 12'],a:0,e:'Фільтр «Бал > 9» показує лише рядки, які відповідають умові.'}],tbl)},
+ {h:'Розмах — це різниця між найбільшим і найменшим значенням ряду. Знайди їх у таблиці.',q:'Який розмах цього ряду балів?',o:['3','5','9','12'],a:1,e:'Розмах: 12 − 7 = 5.'},
+ {h:'Спочатку додай усі бали (сума 64) і поділи на 7, а потім порівняй кожен бал із цим числом.',q:'Скільки учнів мають бал вище середнього? Середнє ≈ 9,1.',o:['1','2','3','4'],a:1,e:'Середнє: 64 ÷ 7 ≈ 9,1. Вище нього лише 10 (Влад) і 12 (Єва).'},
+ {h:'У Влада 10, а в Єви 12. Що спільного в цих двох балів, чого немає в інших?',q:'Який фільтр у таблиці залишить лише Влада та Єву?',o:['Бал більше 9','Бал менше 9','Бал дорівнює 9','Бал не дорівнює 12'],a:0,e:'Фільтр «Бал > 9» показує лише рядки, які відповідають умові.'}],tbl)},
 {lvl:'Рівень 4',topic:'Статистика',title:'Одне дуже велике значення',max:1,run:quiz([
- {q:'У маленькій фірмі працює 6 людей. Їхні місячні зарплати (тис. грн): 12, 12, 13, 13, 14 і 95 (стільки отримує директор).<br><br>Значення, яке різко відрізняється від решти (тут це 95), називають викидом. Він може «перетягнути» середнє на себе.<br><br>Журналіст хоче написати, скільки отримує типовий працівник цієї фірми. Яке число для цього найчесніше?',o:['Середнє: 26,5 тис. грн','Медіана: 13 тис. грн','Найбільше значення: 95 тис. грн','Усі показники однаково добре описують типову зарплату'],a:1,e:'Середнє (159 ÷ 6 = 26,5) завищене через директора, і нікому з п’яти працівників стільки не платять. Медіана — середина впорядкованого ряду (13 і 13) — показує типову зарплату. Тому за наявності викидів краще брати медіану.'}])},
+ {h:'Порахуй середнє: сума 159, поділена на 6. Чи схоже воно на зарплату більшості працівників? Подумай, на яку міру викид майже не впливає.',q:'У маленькій фірмі працює 6 людей. Їхні місячні зарплати (тис. грн): 12, 12, 13, 13, 14 і 95 (стільки отримує директор).<br><br>Значення, яке різко відрізняється від решти (тут це 95), називають викидом. Він може «перетягнути» середнє на себе.<br><br>Журналіст хоче написати, скільки отримує типовий працівник цієї фірми. Яке число для цього найчесніше?',o:['Середнє: 26,5 тис. грн','Медіана: 13 тис. грн','Найбільше значення: 95 тис. грн','Усі показники однаково добре описують типову зарплату'],a:1,e:'Середнє (159 ÷ 6 = 26,5) завищене через директора, і нікому з п’яти працівників стільки не платять. Медіана — середина впорядкованого ряду (13 і 13) — показує типову зарплату. Тому за наявності викидів краще брати медіану.'}])},
 {lvl:'Рівень 5',topic:'Google Таблиці',title:'Функції в Google Таблицях',max:5,run:matchTask},
 {lvl:'Рівень 5',topic:'Google Таблиці',title:'Формули, фільтри, зведені таблиці',max:4,run:quiz([
- {q:'Яка функція підрахує, скільки клітинок діапазону відповідають умові (наприклад, оцінки від 10)?',o:['COUNTIF','SUM','MEDIAN','MAX'],a:0,e:'COUNTIF рахує клітинки за умовою.'},
- {q:'Що зробить формула =IF(B2&gt;=7; "склав"; "не склав")?',o:['Покаже «склав», якщо в B2 число 7 або більше, інакше «не склав»','Додасть 7 до B2','Знайде середнє значення','Відсортує стовпець'],a:0,e:'IF перевіряє умову й повертає одне з двох значень.'},
+ {h:'Назва складається з двох частин: COUNT («рахувати») та IF («якщо»).',q:'Яка функція підрахує, скільки клітинок діапазону відповідають умові (наприклад, оцінки від 10)?',o:['COUNTIF','SUM','MEDIAN','MAX'],a:0,e:'COUNTIF рахує клітинки за умовою.'},
+ {h:'IF має три частини: умова, що показати, якщо вона правдива, і що показати, якщо ні.',q:'Що зробить формула =IF(B2&gt;=7; "склав"; "не склав")?',o:['Покаже «склав», якщо в B2 число 7 або більше, інакше «не склав»','Додасть 7 до B2','Знайде середнє значення','Відсортує стовпець'],a:0,e:'IF перевіряє умову й повертає одне з двох значень.'},
  {q:'Для чого потрібен фільтр у таблиці?',o:['Показати лише рядки, що відповідають умові, не видаляючи решту','Назавжди видалити зайві рядки','Побудувати діаграму','Порахувати суму'],a:0,e:'Фільтр лише ховає рядки, дані залишаються в таблиці.'},
- {q:'Що допоможе швидко підбити підсумки великої таблиці за категоріями (наприклад, середній бал за класами)?',o:['Зведена таблиця','Умовне форматування','Захист аркуша','Коментар до клітинки'],a:0,e:'Зведена таблиця групує дані й рахує підсумки за категоріями.'}])},
+ {h:'Ця можливість «зводить» великі дані в короткий підсумок за групами.',q:'Що допоможе швидко підбити підсумки великої таблиці за категоріями (наприклад, середній бал за класами)?',o:['Зведена таблиця','Умовне форматування','Захист аркуша','Коментар до клітинки'],a:0,e:'Зведена таблиця групує дані й рахує підсумки за категоріями.'}])},
 {lvl:'Рівень 6',topic:'Візуалізація',title:'Діаграми й чесна візуалізація',max:4,run:quiz([
- {q:'Лютневі продажі виглядають майже втричі більшими за січневі. Чому ця діаграма вводить в оману?',pre:bars,o:['Вісь починається не з нуля, тому різниця між 52 і 55 здається величезною','Бракує кругової діаграми','Забагато кольорів','Стовпчики мають бути горизонтальними'],a:0,e:'Насправді 55 лише трохи більше за 52. Чесна діаграма починає стовпчики з нуля.'},
+ {h:'Подивись на позначки вздовж осі: з якого числа починається нижня лінія?',q:'Лютневі продажі виглядають майже втричі більшими за січневі. Чому ця діаграма вводить в оману?',pre:bars,o:['Вісь починається не з нуля, тому різниця між 52 і 55 здається величезною','Бракує кругової діаграми','Забагато кольорів','Стовпчики мають бути горизонтальними'],a:0,e:'Насправді 55 лише трохи більше за 52. Чесна діаграма починає стовпчики з нуля.'},
  {q:'Яка діаграма найкраще покаже, як щодня змінювалася температура протягом місяця?',o:['Лінійна: вона показує зміни в часі','Кругова: вона показує частки від цілого','Жодна, достатньо таблиці','Кругова з 30 секторами'],a:0,e:'Для змін у часі добирають лінійний графік.'},
  {q:'Яку діаграму обрати, щоб показати, з чого складається сімейний бюджет (частки витрат)?',o:['Кругову','Лінійну','Точкову','Жодну'],a:0,e:'Кругова діаграма показує частки від цілого.'},
- {q:'Що показує лінія тренду на графіку?',o:['Загальний напрямок змін даних, що допомагає передбачити подальші значення','Найбільше значення ряду','Кількість повторів у ряді','Помилки в таблиці'],a:0,e:'Лінія тренду згладжує коливання й показує тенденцію.'}])},
+ {h:'Слово «тренд» означає «напрямок, тенденція».',q:'Що показує лінія тренду на графіку?',o:['Загальний напрямок змін даних, що допомагає передбачити подальші значення','Найбільше значення ряду','Кількість повторів у ряді','Помилки в таблиці'],a:0,e:'Лінія тренду згладжує коливання й показує тенденцію.'}])},
 {lvl:'Рівень 7',topic:'Google Trends',title:'Читаємо графік тенденцій',max:2,run:quiz([
- {q:'У якому місяці інтерес до запиту найвищий?',o:['Лютий','Липень','Жовтень','Квітень'],a:0,e:'Пік у лютому, а влітку інтерес мінімальний. Це сезонність.'},
- {q:'Що означає значення 100 у Google Trends?',o:['100 000 пошукових запитів','Пік популярності за обраний період і регіон','100% користувачів шукали це слово','Помилку в даних'],a:1,e:'Google Trends показує відносний інтерес від 0 до 100, а не кількість пошуків.'}],chart)},
+ {h:'Знайди на графіку найвищу точку й подивись на підпис місяця під нею.',q:'У якому місяці інтерес до запиту найвищий?',o:['Лютий','Липень','Жовтень','Квітень'],a:0,e:'Пік у лютому, а влітку інтерес мінімальний. Це сезонність.'},
+ {h:'Google Trends показує не кількість запитів, а відносний інтерес за шкалою від 0 до 100.',q:'Що означає значення 100 у Google Trends?',o:['100 000 пошукових запитів','Пік популярності за обраний період і регіон','100% користувачів шукали це слово','Помилку в даних'],a:1,e:'Google Trends показує відносний інтерес від 0 до 100, а не кількість пошуків.'}],chart)},
 {lvl:'Рівень 7',topic:'Google Trends',title:'Порівнюємо запити',max:2,run:quiz([
  {q:'У якому місяці найвищий інтерес до запиту «пляж»?',o:['Січень','Липень','Жовтень','Грудень'],a:1,e:'Синя лінія досягає піку влітку.'},
  {q:'Який висновок із цього графіка найлогічніший?',o:['Інтерес до запитів змінюється за порами року: взимку лижі, влітку пляж','Лижі та пляж — одне й те саме','Улітку лижі зникають із продажу','Пляжів більше, ніж лиж'],a:0,e:'Графік показує відносний інтерес і сезонність. Про продажі чи кількість він не говорить.'}],chart2)},
 {lvl:'Рівень 8',topic:'Критичне мислення',title:'Правда чи хиба',max:5,run:quiz([
- {q:'Медіана — це значення посередині впорядкованого ряду.',o:['Правда','Хиба'],a:0,fix:1,e:'Так, ряд спочатку впорядковують за зростанням.'},
- {q:'Мода — це сума значень, поділена на їхню кількість.',o:['Правда','Хиба'],a:1,fix:1,e:'Це середнє. Мода — найчастіше значення.'},
- {q:'Google Trends показує абсолютну кількість пошуків.',o:['Правда','Хиба'],a:1,fix:1,e:'Лише відносний інтерес від 0 до 100.'},
- {q:'Один дуже великий викид сильно змінює середнє значення.',o:['Правда','Хиба'],a:0,fix:1,e:'Тому для даних із викидами корисна медіана.'},
- {q:'Якщо дві величини змінюються разом, одна обов’язково є причиною іншої.',o:['Правда','Хиба'],a:1,fix:1,e:'Кореляція не доводить причинності: може бути третій чинник або збіг.'}])},
-{lvl:'Рівень 8',topic:'Критичне мислення',title:'Шлях аналітика',max:2,run:orderTask}
+ {h:'Медіану ще називають «серединним значенням». Подумай, чи треба спершу впорядкувати ряд.',q:'Медіана — це значення посередині впорядкованого ряду.',o:['Правда','Хиба'],a:0,fix:1,e:'Так, ряд спочатку впорядковують за зростанням.'},
+ {h:'Слово «мода» означає «те, що найпопулярніше». Що в ряду найпопулярніше?',q:'Мода — це сума значень, поділена на їхню кількість.',o:['Правда','Хиба'],a:1,fix:1,e:'Це середнє. Мода — найчастіше значення.'},
+ {h:'Згадай, що саме означає число 100 на графіку Google Trends.',q:'Google Trends показує абсолютну кількість пошуків.',o:['Правда','Хиба'],a:1,fix:1,e:'Лише відносний інтерес від 0 до 100.'},
+ {h:'Уяви, що до ряду 1, 2, 3 додали число 100. Як змінилася сума, а отже й середнє?',q:'Один дуже великий викид сильно змінює середнє значення.',o:['Правда','Хиба'],a:0,fix:1,e:'Тому для даних із викидами корисна медіана.'},
+ {h:'Влітку зростають і продажі морозива, і кількість купань. Чи морозиво спричиняє купання?',q:'Якщо дві величини змінюються разом, одна обов’язково є причиною іншої.',o:['Правда','Хиба'],a:1,fix:1,e:'Кореляція не доводить причинності: може бути третій чинник або збіг.'}])},
+{lvl:'Рівень 8',topic:'Критичне мислення',title:'Шлях аналітика',max:1,run:orderTask}
 ];
 const MAX=T.reduce((a,t)=>a+t.max,0);
+const OFF=[];T.reduce((a,t,i)=>(OFF[i]=a,a+t.max),0);
+const pl=n=>n%10===1&&n%100!==11?'питання':'питань';
+const cor=()=>S.res.reduce((a,b)=>a+b,0);
+const net=()=>Math.max(0,cor()-S.hints);
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const load=()=>{try{const o=JSON.parse(localStorage.getItem(KEY)||'null');return o&&o.name&&Array.isArray(o.res)&&typeof o.i==='number'?o:null}catch(e){return null}};
+const wipe=()=>{try{localStorage.removeItem(KEY)}catch(e){}};
+function barBg(){const w=100/MAX,st=[];for(let i=0;i<MAX;i++){const r=S.res[i],c=r===1?'#22c55e':r===0?'#f43f5e':'#262626';st.push(c+' '+((i+.2)*w).toFixed(2)+'%',c+' '+((i+.8)*w).toFixed(2)+'%')}return 'linear-gradient(90deg,'+st.join(',')+')'}
+function cnt(){const c=cor();return `Питання <b>${S.res.length}</b> з ${MAX} · <b class="ok">✓ ${c}</b> · <b class="no">✗ ${S.res.length-c}</b>${S.hints?` · 💡 −${S.hints}`:''}`}
+function hudUpdate(){const a=$('#cnt'),b=$('#bar');if(a)a.innerHTML=cnt();if(b)b.style.background=barBg()}
+function rec(ok){const t=T[S.i],o=S.tp[t.topic]||(S.tp[t.topic]={p:0,m:0,h:0});o.m++;if(ok)o.p++;S.res.push(ok?1:0);save();hudUpdate()}
+function hintUI(el,key,text){
+  const z=$('#hz',el);if(!z||!text)return;
+  const show=()=>{z.innerHTML=`<div class="hintbox">💡 ${text}</div>`};
+  if(S.hu[key]){show();return}
+  z.innerHTML='<button class="btn alt hintbtn" id="hb">💡 Підказка за 1 бал</button><div class="fb no" id="hm" hidden></div>';
+  $('#hb',el).onclick=()=>{
+    if(net()<1){const m=$('#hm',el);m.hidden=false;m.textContent='Підказка коштує 1 бал. Спершу дай правильну відповідь на якесь питання, щоб заробити бал.';return}
+    const o=S.tp[T[S.i].topic]||(S.tp[T[S.i].topic]={p:0,m:0,h:0});
+    o.h=(o.h||0)+1;S.hints++;S.hu[key]=1;save();hudUpdate();show();
+  };
+}
+function hintOff(el){if($('#hb',el))$('#hz',el).innerHTML=''}
 const TIPS={'Поняття':'Повтори, чим відрізняються дані, інформація й висновок.','Штучний інтелект':'Повтори, як формулювати запити до ШІ, чому його відповіді треба перевіряти і чому не можна передавати персональні дані.','Підготовка даних':'Повтори типи даних, очищення (дублікати, пропуски) та що таке репрезентативна вибірка.','Статистика':'Потренуй середнє, медіану, моду, розмах і частоту на власних наборах чисел, а також розглянь викиди.','Google Таблиці':'Попрацюй у Google Таблицях: AVERAGE, MEDIAN, MODE, COUNTIF, IF, фільтри, зведені таблиці.','Візуалізація':'Повтори, яку діаграму для чого обирати, що таке лінія тренду і як не спотворювати дані.','Google Trends':'Відкрий Google Trends, порівняй два запити й подивись, що означають значення 0–100 та сезонність.','Критичне мислення':'Повтори етапи аналізу даних і різницю між кореляцією та причиною.'};
 
 /* ---------- екрани ---------- */
-function hud(bar=true){return `<div id="hud"><span style="font-weight:600; color:#ffffff;">${S.name}, ${S.cls}</span><span>Бали: <b id="sc" style="color:#22c55e;">${S.pts}</b> з ${MAX}</span>${bar?`<div id="bar"><i style="width:${S.i/T.length*100}%"></i></div>`:''}</div>`}
-function start(){
+function hud(bar=true){return `<div id="hud"><span style="font-weight:600; color:#ffffff;">${S.name}, ${S.cls}</span><span id="cnt" class="cnt">${cnt()}</span>${bar?`<div id="bar" style="background:${barBg()}"></div>`:''}</div>`}
+function form(){
   app.innerHTML=`<section class="card"><span class="tag">Місія "Аналітик даних"</span>
   <svg class="circuit" viewBox="0 0 600 150" role="img" aria-label="Схема мікросхеми з лініями даних"><g fill="none" stroke="currentColor" stroke-width="2"><path d="M0 45H70V30H150V50H230"/><path d="M0 75H230"/><path d="M0 105H50V125H140V100H230"/><path d="M370 45H450V25H530V45H600"/><path d="M370 75H480V95H560V75H600"/><path d="M370 105H420V125H510V105H600"/><path d="M260 10V20M290 10V20M320 10V20M350 10V20M260 130V140M290 130V140M320 130V140M350 130V140"/><rect x="230" y="20" width="140" height="110" class="chip"/><path d="M255 110H345"/></g><rect x="262" y="85" width="14" height="25" fill="#22c55e"/><rect x="286" y="62" width="14" height="48" fill="#ffd23f" stroke="currentColor" stroke-width="2"/><rect x="310" y="75" width="14" height="35" fill="#22c55e"/><rect x="334" y="50" width="14" height="60" fill="#ffd23f" stroke="currentColor" stroke-width="2"/><circle cx="246" cy="36" r="3.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2"><circle cx="150" cy="30" r="5" fill="#ffd23f"/><circle cx="140" cy="125" r="5" fill="#22c55e"/><circle cx="530" cy="25" r="5" fill="#22c55e"/><circle cx="510" cy="125" r="5" fill="#ffd23f"/><circle cx="480" cy="75" r="5" fill="#ffd23f"/><circle cx="560" cy="95" r="5" fill="#22c55e"/></g></svg>
-  <p style="color: #a3a3a3; margin-bottom: 20px;">${T.length} завдань про аналіз даних, ШІ, Google Таблиці й Google Trends. За кожну правильну відповідь ти отримуєш бали, а в кінці побачиш свою оцінку за 12-бальною шкалою та звіт про те, що опановано.</p>
+  <p style="color: #a3a3a3; margin-bottom: 20px;"><b style="color:#fff">Тема: аналіз даних.</b> Перевір себе: ШІ, Google Таблиці, середнє, медіана, мода, Google Trends і діаграми. ${T.length} завдань, ${MAX} питань.</p>
   <div style="display: grid; gap: 16px; max-width: 360px;">
     <div>
       <label for="nm" style="display:block; font-size:0.9rem; font-weight:600; margin-bottom:6px; color:#a3a3a3;">Твоє ім’я та прізвище</label>
@@ -447,7 +480,7 @@ function start(){
   </div>
   <div class="fb no" id="er" hidden style="margin-top:16px;"></div>
   <br><button class="btn" id="go">Почати місію</button></section>`;
-  $('#go').onclick=()=>{const n=$('#nm').value.trim(),c=$('#cl').value.trim();if(!n||!c){const e=$('#er');e.hidden=false;e.textContent='Вкажи ім’я, прізвище й клас, наприклад 10-А, щоб учитель знав, чий це результат.';return}S.name=n;S.cls=c;S.i=0;S.pts=0;S.tp={};task()};
+  $('#go').onclick=()=>{const n=$('#nm').value.trim(),c=$('#cl').value.trim();if(!n||!c){const e=$('#er');e.hidden=false;e.textContent='Вкажи ім’я, прізвище й клас, наприклад 10-А, щоб учитель знав, чий це результат.';return}Object.assign(S,fresh(),{name:n.replace(/[<>&"]/g,''),cls:c.replace(/[<>&"]/g,'')});save();task()};
   $('#nm').onkeydown=$('#cl').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
 }
 function task(){
@@ -456,32 +489,48 @@ function task(){
   t.run($('#body'),done);
   window.scrollTo(0,0);
 }
-function done(p){
-  const t=T[S.i],o=S.tp[t.topic]||(S.tp[t.topic]={p:0,m:0});
-  o.p+=p;o.m+=t.max;S.pts+=p;
-  $('#sc').textContent=S.pts;$('#bar i').style.width=(S.i+1)/T.length*100+'%';
+function done(){
+  const t=T[S.i],c=S.res.slice(OFF[S.i],OFF[S.i]+t.max).reduce((a,b)=>a+b,0);
+  S.fin=true;save();
   const last=S.i===T.length-1;
-  $('#nav').innerHTML=`<p class="done">Отримано балів: ${p} з ${t.max}</p><button class="btn" id="nxt">${last?'Побачити звіт':'Далі'}</button>`;
-  $('#nxt').onclick=()=>{S.i++;last?report():task()};
+  $('#nav').innerHTML=`<p class="done">Правильно в цьому завданні: ${c} з ${t.max} ${pl(t.max)}</p><button class="btn" id="nxt">${last?'Побачити звіт':'Далі'}</button>`;
+  $('#nxt').onclick=advance;
   $('#nxt').focus();
 }
+function advance(){
+  const last=S.i===T.length-1;
+  S.fin=false;S.k=0;
+  if(last){S.end=true;save();report()}else{S.i++;save();task()}
+}
+function start(){
+  const sv=load();
+  if(!sv||sv.i>=T.length||sv.res.length>MAX){wipe();form();return}
+  Object.assign(S,fresh(),sv);
+  app.innerHTML=`<section class="card"><span class="tag">Збережений прогрес</span><h1>З поверненням, ${S.name}!</h1><p style="color:#a3a3a3;margin:8px 0 20px;">Клас: ${S.cls}. ${S.end?'Місію завершено, можна переглянути звіт.':`Відповіді: ${S.res.length} з ${MAX} ${pl(MAX)}, завдання ${Math.min(S.i+(S.fin?2:1),T.length)} з ${T.length}.`}</p><div class="btns" style="margin-top:0"><button class="btn" id="rs">${S.end?'Показати звіт':'Продовжити'}</button><button class="btn alt" id="nw">Почати заново</button></div></section>`;
+  $('#rs').onclick=()=>{if(S.end)report();else if(S.fin)advance();else task()};
+  let armed=false;
+  $('#nw').onclick=()=>{
+    if(!armed){armed=true;$('#nw').textContent='Так, видалити прогрес';return}
+    wipe();Object.assign(S,{name:'',cls:''},fresh());form();
+  };
+}
 function report(){
-  const g=Math.max(1,Math.min(12,Math.round(S.pts/MAX*12)));
+  const g=Math.max(1,Math.min(12,Math.round(net()/MAX*12)));
   const rank=g>=10?'Експерт даних':g>=7?'Аналітик':g>=4?'Стажер-аналітик':'Початківець';
   const ks=Object.keys(S.tp);
-  const rows=ks.map(k=>{const o=S.tp[k],pc=Math.round(o.p/o.m*100),cl=pc>=80?'':pc>=50?'mid':'low',st=pc>=80?'Опановано':pc>=50?'Майже опановано':'Потребує повторення';
-    return `<div class="tb"><div class="t"><span>${k}</span><span>${o.p}/${o.m}, ${pc}%</span></div><div class="bg"><i class="${cl}" style="width:${pc}%"></i></div><p>${st}.${pc<80?' '+TIPS[k]:''}</p></div>`}).join('');
-  const weak=ks.filter(k=>S.tp[k].p/S.tp[k].m<0.8);
+  const rows=ks.map(k=>{const o=S.tp[k],nt=Math.max(0,o.p-(o.h||0)),pc=Math.round(nt/o.m*100),cl=pc>=80?'':pc>=50?'mid':'low',st=pc>=80?'Опановано':pc>=50?'Майже опановано':'Потребує повторення';
+    return `<div class="tb"><div class="t"><span>${k}</span><span>${o.p} з ${o.m}${o.h?` (підказок: ${o.h})`:''}, ${pc}%</span></div><div class="bg"><i class="${cl}" style="width:${pc}%"></i></div><p>${st}.${pc<80?' '+TIPS[k]:''}</p></div>`}).join('');
+  const weak=ks.filter(k=>(S.tp[k].p-(S.tp[k].h||0))/S.tp[k].m<0.8);
   const sum=weak.length?`Для підвищення результату повтори: ${weak.join(', ')}.`:'Тему засвоєно на високому рівні. Так тримати!';
   app.innerHTML=hud(false)+`<section class="card"><span class="tag">Звіт про засвоєння теми</span><h1>${S.name}</h1><p style="color:#a3a3a3;margin-bottom:12px;"><b>Клас: ${S.cls}</b></p>
   <div class="grade">${g}<small>з 12</small></div>
-  <p style="text-align:center; color:#a3a3a3; margin-bottom:20px;"><b>Рівень: ${rank}.</b> Набрано ${S.pts} з ${MAX} балів (${Math.round(S.pts/MAX*100)}%). Дата: ${new Date().toLocaleDateString('uk-UA')}.</p>
+  <p style="text-align:center; color:#a3a3a3; margin-bottom:20px;"><b>Рівень: ${rank}.</b> Правильно: ${cor()} з ${MAX} ${pl(MAX)}${S.hints?`; підказок використано: ${S.hints} (−${S.hints} бал.)`:''}. Підсумок: ${net()} з ${MAX} (${Math.round(net()/MAX*100)}%). Дата: ${new Date().toLocaleDateString('uk-UA')}.</p>
   ${rows}<p style="margin-top:20px; font-weight:600; color:#ffffff;"><b>${sum}</b></p>
   <div class="btns"><button class="btn alt" id="pr">Друкувати / зберегти PDF</button><button class="btn alt" id="cp">Скопіювати результат</button><button class="btn alt" id="rp">Пройти ще раз</button></div><div class="fb" id="fb"></div></section>`;
   $('#pr').onclick=()=>window.print();
-  $('#rp').onclick=start;
+  $('#rp').onclick=()=>{wipe();Object.assign(S,{name:'',cls:''},fresh());form()};
   $('#cp').onclick=()=>{
-    const tx=`${S.name} (${S.cls}): оцінка ${g}/12 (${S.pts} з ${MAX} балів). `+ks.map(k=>`${k} ${S.tp[k].p}/${S.tp[k].m}`).join('; ');
+    const tx=`${S.name} (${S.cls}): оцінка ${g}/12 (правильно ${cor()} з ${MAX} питань, підказок: ${S.hints}). `+ks.map(k=>`${k} ${S.tp[k].p}/${S.tp[k].m}`).join('; ');
     const ok=()=>{$('#fb').textContent='Результат скопійовано. Надішли його вчителю.'};
     try{navigator.clipboard.writeText(tx).then(ok,()=>{$('#fb').textContent=tx})}catch(e){$('#fb').textContent=tx}
   };
